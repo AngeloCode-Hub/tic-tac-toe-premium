@@ -229,6 +229,25 @@ function applyRemoteBoard(board, pairIndex = currentPairIndex) {
     });
 }
 
+function getRoomPlayerBySymbol(room, symbol) {
+    if (!room || !Array.isArray(room.players)) return null;
+    return room.players.find((player) => player.symbol === symbol) || null;
+}
+
+function getRoomPlayerName(room, symbol, fallback) {
+    const player = getRoomPlayerBySymbol(room, symbol);
+    const name = player && typeof player.name === 'string' ? player.name.trim() : '';
+    return name || fallback;
+}
+
+function getOnlineStatusHeader(room) {
+    const xName = getRoomPlayerName(room, 'X', 'Player X');
+    const oName = getRoomPlayerName(room, 'O', room.status === 'waiting' ? 'Waiting...' : 'Player O');
+    const xDisplay = toDisplaySymbol('X', currentPairIndex);
+    const oDisplay = toDisplaySymbol('O', currentPairIndex);
+    return `Room ${room.roomId}: ${xName} (${xDisplay}) vs ${oName} (${oDisplay})`;
+}
+
 function renderOnlineState(room) {
     if (!room) return;
 
@@ -246,13 +265,15 @@ function renderOnlineState(room) {
 
     const yourSymbol = toDisplaySymbol(room.yourSymbol, currentPairIndex);
     const turnSymbol = toDisplaySymbol(room.currentTurn, currentPairIndex);
+    const statusHeader = getOnlineStatusHeader(room);
+    const turnPlayerName = getRoomPlayerName(room, room.currentTurn, `Player ${room.currentTurn}`);
 
     if (roomCodeDisplay && room.roomId) {
         roomCodeDisplay.textContent = `Room: ${room.roomId}`;
     }
 
     if (room.status === 'waiting') {
-        statusDisplay.innerHTML = 'Waiting for opponent to join...';
+        statusDisplay.innerHTML = `${statusHeader}<br>Waiting for opponent to join...`;
         statusDisplay.style.color = 'var(--text-dim)';
         setOnlineFeedback('Share your invite link with your friend.');
         return;
@@ -260,7 +281,10 @@ function renderOnlineState(room) {
 
     if (room.status === 'active') {
         const yourTurn = room.yourTurn;
-        statusDisplay.innerHTML = yourTurn ? `Your turn (${yourSymbol})` : `Opponent's turn (${turnSymbol})`;
+        const line = yourTurn
+            ? `Your turn: ${turnPlayerName} (${yourSymbol})`
+            : `Turn: ${turnPlayerName} (${turnSymbol})`;
+        statusDisplay.innerHTML = `${statusHeader}<br>${line}`;
         statusDisplay.style.color = yourTurn ? '#93c5fd' : 'var(--text-dim)';
         setOnlineFeedback(yourTurn ? 'Make your move.' : 'Waiting for opponent move.');
         return;
@@ -268,11 +292,12 @@ function renderOnlineState(room) {
 
     if (room.status === 'finished') {
         if (room.winner) {
-            const youWon = room.winner === room.yourSymbol;
-            statusDisplay.innerHTML = youWon ? 'You win!' : 'You lose!';
-            statusDisplay.style.color = youWon ? '#22c55e' : '#f87171';
+            const winnerName = getRoomPlayerName(room, room.winner, `Player ${room.winner}`);
+            const winnerSymbol = toDisplaySymbol(room.winner, currentPairIndex);
+            statusDisplay.innerHTML = `${statusHeader}<br>Winner: ${winnerName} (${winnerSymbol})`;
+            statusDisplay.style.color = '#22c55e';
         } else {
-            statusDisplay.innerHTML = 'Draw!';
+            statusDisplay.innerHTML = `${statusHeader}<br>Result: Draw`;
             statusDisplay.style.color = '#cbd5e1';
         }
         setOnlineFeedback('Game ended. Tap Restart to play again.');
