@@ -13,7 +13,12 @@ const MAX_SYMBOL_PAIR_INDEX = 2;
 const rooms = new Map();
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
   res.end(JSON.stringify(payload));
 }
 
@@ -185,7 +190,12 @@ function serveStatic(req, res) {
       '.webp': 'image/webp'
     }[ext] || 'application/octet-stream';
 
-    res.writeHead(200, { 'Content-Type': contentType });
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0'
+    });
     res.end(content);
   });
 }
