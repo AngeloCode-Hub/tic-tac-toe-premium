@@ -37,6 +37,12 @@ const scrollHint = document.getElementById('scrollHint');
 const shareWhatsApp = document.getElementById('shareWhatsApp');
 const shareFacebook = document.getElementById('shareFacebook');
 const shareCopy = document.getElementById('shareCopy');
+const gameBtns = document.querySelectorAll('.game-btn');
+const ticTacToeBoard = document.getElementById('board');
+const connect4Board = document.getElementById('connect4Board');
+const battleshipSection = document.getElementById('battleshipSection');
+const battleshipOwnGrid = document.getElementById('battleshipOwnGrid');
+const battleshipTargetGrid = document.getElementById('battleshipTargetGrid');
 
 console.log('Game Script Loaded');
 
@@ -64,6 +70,17 @@ let currentPlayer = symbolPairs[0].p1;
 let onlineSession = null;
 let onlinePollInterval = null;
 let canEditOnlineSymbolStyle = true;
+let selectedGameType = 'tictactoe';
+
+const CONNECT4_ROWS = 6;
+const CONNECT4_COLS = 7;
+let connect4Grid = Array.from({ length: CONNECT4_ROWS }, () => Array(CONNECT4_COLS).fill(''));
+let connect4CurrentTurn = 'X';
+let connect4Active = true;
+
+const BATTLESHIP_SIZE = 6;
+const BATTLESHIP_SHIP_COUNT = 6;
+let battleshipState = null;
 
 const winningConditions = [
     [0, 1, 2],
@@ -77,7 +94,7 @@ const winningConditions = [
 ];
 
 function isOnlineMode() {
-    return gameMode === 'Online';
+    return selectedGameType === 'tictactoe' && gameMode === 'Online';
 }
 
 function setOnlineFeedback(message, isError = false) {
@@ -138,6 +155,63 @@ function setSymbolSelectionDisabled(disabled) {
     symbolBtns.forEach((btn) => {
         btn.disabled = Boolean(disabled);
     });
+}
+
+function getOpponentLabel() {
+    return gameMode === 'PvAI' ? 'AI' : 'Player 2';
+}
+
+function updateGameButtons() {
+    gameBtns.forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-game') === selectedGameType);
+    });
+}
+
+function setModeButtonsAvailability() {
+    if (!pvpBtn || !pvcBtn || !onlineBtn || !goOnlineBtn) return;
+
+    if (selectedGameType === 'tictactoe') {
+        pvpBtn.disabled = false;
+        pvcBtn.disabled = false;
+        onlineBtn.disabled = false;
+        goOnlineBtn.style.display = 'inline-flex';
+        return;
+    }
+
+    if (selectedGameType === 'connect4') {
+        pvpBtn.disabled = false;
+        pvcBtn.disabled = false;
+        onlineBtn.disabled = true;
+        goOnlineBtn.style.display = 'none';
+        return;
+    }
+
+    pvpBtn.disabled = true;
+    pvcBtn.disabled = false;
+    onlineBtn.disabled = true;
+    goOnlineBtn.style.display = 'none';
+}
+
+function updateVisibleBoard() {
+    if (ticTacToeBoard) ticTacToeBoard.style.display = selectedGameType === 'tictactoe' ? 'grid' : 'none';
+    if (connect4Board) connect4Board.style.display = selectedGameType === 'connect4' ? 'grid' : 'none';
+    if (battleshipSection) battleshipSection.style.display = selectedGameType === 'battleship' ? 'block' : 'none';
+}
+
+function setSelectedGameType(gameType) {
+    if (!['tictactoe', 'connect4', 'battleship'].includes(gameType)) return;
+    selectedGameType = gameType;
+    updateGameButtons();
+    updateVisibleBoard();
+    setModeButtonsAvailability();
+
+    if (selectedGameType !== 'tictactoe' && isOnlineMode()) {
+        setGameMode('PvP');
+    } else if (selectedGameType === 'battleship' && gameMode !== 'PvAI') {
+        setGameMode('PvAI');
+    } else {
+        handleRestartGame();
+    }
 }
 
 function getRoomCodeFromLocation() {
@@ -216,6 +290,253 @@ function getInviteBaseUrl() {
         setOnlineFeedback('Ongeldige URL. Gebruik bijvoorbeeld https://jouw-app.onrender.com', true);
         return '';
     }
+}
+
+function createConnect4Board() {
+    if (!connect4Board) return;
+    connect4Board.innerHTML = '';
+    for (let row = 0; row < CONNECT4_ROWS; row += 1) {
+        for (let col = 0; col < CONNECT4_COLS; col += 1) {
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'connect4-cell';
+            cell.setAttribute('data-row', String(row));
+            cell.setAttribute('data-col', String(col));
+            connect4Board.appendChild(cell);
+        }
+    }
+}
+
+function renderConnect4Board() {
+    if (!connect4Board) return;
+    const connect4Cells = connect4Board.querySelectorAll('.connect4-cell');
+    connect4Cells.forEach((cell) => {
+        const row = Number(cell.getAttribute('data-row'));
+        const col = Number(cell.getAttribute('data-col'));
+        const value = connect4Grid[row][col];
+        cell.textContent = toDisplaySymbol(value, currentPairIndex);
+    });
+}
+
+function findConnect4DropRow(col) {
+    for (let row = CONNECT4_ROWS - 1; row >= 0; row -= 1) {
+        if (!connect4Grid[row][col]) return row;
+    }
+    return -1;
+}
+
+function hasConnect4Winner(row, col, symbol) {
+    const directions = [
+        [0, 1],
+        [1, 0],
+        [1, 1],
+        [1, -1]
+    ];
+
+    return directions.some(([dr, dc]) => {
+        let count = 1;
+        let r = row + dr;
+        let c = col + dc;
+        while (r >= 0 && r < CONNECT4_ROWS && c >= 0 && c < CONNECT4_COLS && connect4Grid[r][c] === symbol) {
+            count += 1;
+            r += dr;
+            c += dc;
+        }
+        r = row - dr;
+        c = col - dc;
+        while (r >= 0 && r < CONNECT4_ROWS && c >= 0 && c < CONNECT4_COLS && connect4Grid[r][c] === symbol) {
+            count += 1;
+            r -= dr;
+            c -= dc;
+        }
+        return count >= 4;
+    });
+}
+
+function updateConnect4Status(message, color = 'var(--text-dim)') {
+    statusDisplay.textContent = message;
+    statusDisplay.style.color = color;
+}
+
+function applyConnect4Move(col) {
+    if (!connect4Active) return;
+    const row = findConnect4DropRow(col);
+    if (row === -1) return;
+
+    connect4Grid[row][col] = connect4CurrentTurn;
+    renderConnect4Board();
+
+    if (hasConnect4Winner(row, col, connect4CurrentTurn)) {
+        connect4Active = false;
+        const winnerName = connect4CurrentTurn === 'X' ? playerName : getOpponentLabel();
+        updateConnect4Status(`Vier op een rij: ${winnerName} wint!`, '#22c55e');
+        if (gameMode === 'PvAI') {
+            updateStats(connect4CurrentTurn === 'X' ? 'win' : 'loss');
+        }
+        return;
+    }
+
+    const isDraw = connect4Grid.every((boardRow) => boardRow.every((cell) => Boolean(cell)));
+    if (isDraw) {
+        connect4Active = false;
+        updateConnect4Status('Vier op een rij: Gelijkspel', '#cbd5e1');
+        updateStats('draw');
+        return;
+    }
+
+    connect4CurrentTurn = connect4CurrentTurn === 'X' ? 'O' : 'X';
+    const turnName = connect4CurrentTurn === 'X' ? playerName : getOpponentLabel();
+    updateConnect4Status(`Vier op een rij - Beurt: ${turnName} (${toDisplaySymbol(connect4CurrentTurn)})`, 'var(--text-dim)');
+
+    if (gameMode === 'PvAI' && connect4CurrentTurn === 'O') {
+        setTimeout(makeConnect4AiMove, 350);
+    }
+}
+
+function makeConnect4AiMove() {
+    if (!connect4Active || connect4CurrentTurn !== 'O') return;
+    const availableCols = [];
+    for (let col = 0; col < CONNECT4_COLS; col += 1) {
+        if (findConnect4DropRow(col) !== -1) availableCols.push(col);
+    }
+    if (availableCols.length === 0) return;
+    const randomCol = availableCols[Math.floor(Math.random() * availableCols.length)];
+    applyConnect4Move(randomCol);
+}
+
+function restartConnect4() {
+    connect4Grid = Array.from({ length: CONNECT4_ROWS }, () => Array(CONNECT4_COLS).fill(''));
+    connect4CurrentTurn = 'X';
+    connect4Active = true;
+    renderConnect4Board();
+    updateConnect4Status(`Vier op een rij - Beurt: ${playerName} (${toDisplaySymbol('X')})`, 'var(--text-dim)');
+}
+
+function randomUniqueCells(size, count) {
+    const max = size * size;
+    const values = new Set();
+    while (values.size < count) {
+        values.add(Math.floor(Math.random() * max));
+    }
+    return values;
+}
+
+function createBattleshipGrid(root, type) {
+    if (!root) return;
+    root.innerHTML = '';
+    for (let index = 0; index < BATTLESHIP_SIZE * BATTLESHIP_SIZE; index += 1) {
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'battleship-cell';
+        cell.setAttribute('data-index', String(index));
+        cell.setAttribute('data-grid', type);
+        root.appendChild(cell);
+    }
+}
+
+function updateBattleshipStatus(message, color = 'var(--text-dim)') {
+    statusDisplay.textContent = message;
+    statusDisplay.style.color = color;
+}
+
+function renderBattleshipBoards() {
+    if (!battleshipState || !battleshipOwnGrid || !battleshipTargetGrid) return;
+
+    const ownCells = battleshipOwnGrid.querySelectorAll('.battleship-cell');
+    ownCells.forEach((cell) => {
+        const index = Number(cell.getAttribute('data-index'));
+        const hasShip = battleshipState.playerShips.has(index);
+        const wasHit = battleshipState.aiShots.has(index) && hasShip;
+        const wasMiss = battleshipState.aiShots.has(index) && !hasShip;
+        cell.classList.toggle('ship', hasShip);
+        cell.classList.toggle('hit', wasHit);
+        cell.classList.toggle('miss', wasMiss);
+        cell.disabled = true;
+    });
+
+    const targetCells = battleshipTargetGrid.querySelectorAll('.battleship-cell');
+    targetCells.forEach((cell) => {
+        const index = Number(cell.getAttribute('data-index'));
+        const wasShot = battleshipState.playerShots.has(index);
+        const wasHit = wasShot && battleshipState.aiShips.has(index);
+        cell.classList.toggle('hit', wasHit);
+        cell.classList.toggle('miss', wasShot && !wasHit);
+        cell.disabled = battleshipState.turn !== 'player' || battleshipState.playerShots.has(index) || !battleshipState.active;
+    });
+}
+
+function finishBattleship(playerWon) {
+    battleshipState.active = false;
+    if (playerWon) {
+        updateBattleshipStatus(`Zeeslag: ${playerName} wint!`, '#22c55e');
+        updateStats('win');
+    } else {
+        updateBattleshipStatus('Zeeslag: AI wint!', '#f87171');
+        updateStats('loss');
+    }
+    renderBattleshipBoards();
+}
+
+function runBattleshipAiTurn() {
+    if (!battleshipState || !battleshipState.active || battleshipState.turn !== 'ai') return;
+
+    const available = [];
+    for (let index = 0; index < BATTLESHIP_SIZE * BATTLESHIP_SIZE; index += 1) {
+        if (!battleshipState.aiShots.has(index)) {
+            available.push(index);
+        }
+    }
+    if (available.length === 0) return;
+
+    const pick = available[Math.floor(Math.random() * available.length)];
+    battleshipState.aiShots.add(pick);
+    if (battleshipState.playerShips.has(pick)) {
+        battleshipState.aiHits += 1;
+    }
+
+    if (battleshipState.aiHits >= BATTLESHIP_SHIP_COUNT) {
+        finishBattleship(false);
+        return;
+    }
+
+    battleshipState.turn = 'player';
+    updateBattleshipStatus('Zeeslag - Jouw beurt om te schieten', '#93c5fd');
+    renderBattleshipBoards();
+}
+
+function handleBattleshipShot(index) {
+    if (!battleshipState || !battleshipState.active || battleshipState.turn !== 'player') return;
+    if (battleshipState.playerShots.has(index)) return;
+
+    battleshipState.playerShots.add(index);
+    if (battleshipState.aiShips.has(index)) {
+        battleshipState.playerHits += 1;
+    }
+
+    if (battleshipState.playerHits >= BATTLESHIP_SHIP_COUNT) {
+        finishBattleship(true);
+        return;
+    }
+
+    battleshipState.turn = 'ai';
+    updateBattleshipStatus('Zeeslag - AI is aan zet...', 'var(--text-dim)');
+    renderBattleshipBoards();
+    setTimeout(runBattleshipAiTurn, 450);
+}
+
+function restartBattleship() {
+    battleshipState = {
+        playerShips: randomUniqueCells(BATTLESHIP_SIZE, BATTLESHIP_SHIP_COUNT),
+        aiShips: randomUniqueCells(BATTLESHIP_SIZE, BATTLESHIP_SHIP_COUNT),
+        playerShots: new Set(),
+        aiShots: new Set(),
+        playerHits: 0,
+        aiHits: 0,
+        turn: 'player',
+        active: true
+    };
+    renderBattleshipBoards();
+    updateBattleshipStatus('Zeeslag - Jouw beurt om te schieten', '#93c5fd');
 }
 
 function applyRemoteBoard(board, pairIndex = currentPairIndex) {
@@ -724,6 +1045,16 @@ function checkWinner() {
 }
 
 function handleRestartGame() {
+    if (selectedGameType === 'connect4') {
+        restartConnect4();
+        return;
+    }
+
+    if (selectedGameType === 'battleship') {
+        restartBattleship();
+        return;
+    }
+
     if (isOnlineMode() && onlineSession) {
         onlineApi(`/rooms/${onlineSession.roomId}/restart`, {
             method: 'POST',
@@ -757,15 +1088,26 @@ function handleRestartGame() {
 
 function setGameMode(mode) {
     console.log(`Setting mode: ${mode}`);
+
+    if (selectedGameType !== 'tictactoe' && mode === 'Online') {
+        setOnlineFeedback('Online mode is momenteel alleen beschikbaar voor TicTacToe.');
+        mode = 'PvP';
+    }
+
+    if (selectedGameType === 'battleship' && mode !== 'PvAI') {
+        mode = 'PvAI';
+    }
+
     gameMode = mode;
 
     setModeButtons(mode);
 
     if (difficultyContainer) {
-        difficultyContainer.style.display = mode === 'PvAI' ? 'flex' : 'none';
+        const showDifficulty = mode === 'PvAI' && (selectedGameType === 'tictactoe' || selectedGameType === 'connect4');
+        difficultyContainer.style.display = showDifficulty ? 'flex' : 'none';
     }
     if (onlineSection) {
-        onlineSection.style.display = mode === 'Online' ? 'flex' : 'none';
+        onlineSection.style.display = selectedGameType === 'tictactoe' && mode === 'Online' ? 'flex' : 'none';
     }
 
     if (mode !== 'Online') {
@@ -774,7 +1116,7 @@ function setGameMode(mode) {
 
     handleRestartGame();
 
-    if (mode === 'Online') {
+    if (mode === 'Online' && selectedGameType === 'tictactoe') {
         if (onlineSession) {
             setOnlineControlsState(true);
             startOnlinePolling();
@@ -829,6 +1171,41 @@ if (cells.length > 0) {
     });
 } else {
     console.error("No cells found");
+}
+
+if (connect4Board) {
+    connect4Board.addEventListener('click', (event) => {
+        if (selectedGameType !== 'connect4') return;
+        const target = event.target.closest('.connect4-cell');
+        if (!target || !connect4Active) return;
+        if (gameMode === 'PvAI' && connect4CurrentTurn === 'O') return;
+        const col = Number(target.getAttribute('data-col'));
+        if (!Number.isInteger(col)) return;
+        applyConnect4Move(col);
+    });
+}
+
+if (battleshipTargetGrid) {
+    battleshipTargetGrid.addEventListener('click', (event) => {
+        if (selectedGameType !== 'battleship') return;
+        const target = event.target.closest('.battleship-cell');
+        if (!target) return;
+        const index = Number(target.getAttribute('data-index'));
+        if (!Number.isInteger(index)) return;
+        handleBattleshipShot(index);
+    });
+}
+
+if (gameBtns.length > 0) {
+    gameBtns.forEach((btn) => {
+        const handler = (event) => {
+            if (event.type === 'touchstart') event.preventDefault();
+            const selected = event.currentTarget.getAttribute('data-game');
+            setSelectedGameType(selected);
+        };
+        btn.addEventListener('click', handler);
+        btn.addEventListener('touchstart', handler, { passive: false });
+    });
 }
 
 if (restartBtn) {
@@ -1278,9 +1655,19 @@ function updatePlayerName() {
     playerName = name;
     localStorage.setItem('playerName', playerName);
     playerNameDisplay.textContent = playerName;
+
+    if (selectedGameType === 'connect4' || selectedGameType === 'battleship') {
+        handleRestartGame();
+    }
 }
 
 // Initialize
+createConnect4Board();
+createBattleshipGrid(battleshipOwnGrid, 'own');
+createBattleshipGrid(battleshipTargetGrid, 'target');
+updateVisibleBoard();
+updateGameButtons();
+setModeButtonsAvailability();
 setGameMode('PvAI');
 document.body.classList.add('theme-nebula'); // Default theme
 

@@ -238,6 +238,37 @@ header {
   margin-bottom: 2rem;
 }
 
+.game-selection {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-bottom: 1.1rem;
+  flex-wrap: wrap;
+}
+
+.game-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-dim);
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  transition: all 0.2s ease;
+}
+
+.game-btn:hover {
+  color: var(--text-light);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.game-btn.active {
+  color: #fff;
+  border-color: transparent;
+  background: var(--primary-gradient);
+}
+
 .cell {
   width: var(--cell-size);
   height: var(--cell-size);
@@ -253,6 +284,93 @@ header {
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   color: var(--text-light);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.connect4-board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(34px, 1fr));
+  gap: 8px;
+  margin: 0 0 1.3rem;
+  width: 100%;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.connect4-cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.15rem;
+  transition: all 0.2s ease;
+}
+
+.connect4-cell:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.battleship-section {
+  width: 100%;
+  margin-bottom: 1.3rem;
+}
+
+.battleship-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.battleship-panel {
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.7rem;
+}
+
+.battleship-panel h3 {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.45rem;
+  font-weight: 600;
+}
+
+.battleship-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(26px, 1fr));
+  gap: 6px;
+}
+
+.battleship-cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.battleship-cell:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.battleship-cell.ship {
+  background: rgba(147, 197, 253, 0.3);
+}
+
+.battleship-cell.hit {
+  background: rgba(248, 113, 113, 0.6);
+  border-color: rgba(248, 113, 113, 0.8);
+}
+
+.battleship-cell.miss {
+  background: rgba(148, 163, 184, 0.25);
 }
 
 .cell:hover {
@@ -501,6 +619,12 @@ header {
     transform: scale(1.2);
     border-color: white;
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 640px) {
+  .battleship-panels {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Theme Definitions */

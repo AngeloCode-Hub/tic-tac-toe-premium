@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tic-Tac-Toe Premium</title>
+    <title>Arcade Board Games</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -21,12 +21,18 @@
 
     <main class="container">
       <header>
-        <h1 class="game-title">Tic <span class="highlight">Tac</span> Toe</h1>
+        <h1 class="game-title">Arcade <span class="highlight">Board</span> Games</h1>
         <div class="player-name-container">
           <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20" />
         </div>
         <div class="status-display" id="status">Player X's Turn</div>
       </header>
+
+      <div class="game-selection" id="gameSelection">
+        <button class="game-btn active" data-game="tictactoe">TicTacToe</button>
+        <button class="game-btn" data-game="connect4">Vier op een rij</button>
+        <button class="game-btn" data-game="battleship">Zeeslag</button>
+      </div>
 
       <div class="game-board" id="board">
         <div class="cell" data-index="0"></div>
@@ -39,6 +45,21 @@
         <div class="cell" data-index="7"></div>
         <div class="cell" data-index="8"></div>
       </div>
+
+      <div class="connect4-board" id="connect4Board" style="display: none;"></div>
+
+      <section class="battleship-section" id="battleshipSection" style="display: none;">
+        <div class="battleship-panels">
+          <div class="battleship-panel">
+            <h3>Jouw vloot</h3>
+            <div class="battleship-grid own" id="battleshipOwnGrid"></div>
+          </div>
+          <div class="battleship-panel">
+            <h3>Aanval op tegenstander</h3>
+            <div class="battleship-grid target" id="battleshipTargetGrid"></div>
+          </div>
+        </div>
+      </section>
 
       <div class="controls">
         <div class="mode-selection">
