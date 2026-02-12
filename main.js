@@ -106,6 +106,33 @@ function normalizeRoomCode(value) {
     return (value || '').trim().toUpperCase();
 }
 
+function getPairByIndex(index) {
+    const parsedIndex = Number(index);
+    if (!Number.isInteger(parsedIndex) || parsedIndex < 0 || parsedIndex >= symbolPairs.length) {
+        return symbolPairs[0];
+    }
+    return symbolPairs[parsedIndex];
+}
+
+function toDisplaySymbol(canonicalSymbol, pairIndex = currentPairIndex) {
+    if (!canonicalSymbol) return '';
+    const pair = getPairByIndex(pairIndex);
+    if (canonicalSymbol === 'X') return pair.p1;
+    if (canonicalSymbol === 'O') return pair.p2;
+    return canonicalSymbol;
+}
+
+function updateSymbolButtons() {
+    symbolBtns.forEach(btn => {
+        const btnIndex = parseInt(btn.getAttribute('data-pair'));
+        if (btnIndex === currentPairIndex) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
 function getRoomCodeFromLocation() {
     const queryCode = normalizeRoomCode(new URLSearchParams(window.location.search).get('room'));
     if (queryCode) return queryCode;
@@ -184,13 +211,13 @@ function getInviteBaseUrl() {
     }
 }
 
-function applyRemoteBoard(board) {
+function applyRemoteBoard(board, pairIndex = currentPairIndex) {
     if (!Array.isArray(board) || board.length !== 9) return;
 
     gameState = board.slice();
     cells.forEach((cell, index) => {
         const value = gameState[index] || '';
-        cell.innerHTML = value;
+        cell.innerHTML = toDisplaySymbol(value, pairIndex);
         cell.classList.toggle('occupied', value !== '');
     });
 }
@@ -198,9 +225,12 @@ function applyRemoteBoard(board) {
 function renderOnlineState(room) {
     if (!room) return;
 
-    applyRemoteBoard(room.board);
+    applyRemoteBoard(room.board, currentPairIndex);
     currentPlayer = room.currentTurn || 'X';
     gameActive = room.status === 'active';
+
+    const yourSymbol = toDisplaySymbol(room.yourSymbol, currentPairIndex);
+    const turnSymbol = toDisplaySymbol(room.currentTurn, currentPairIndex);
 
     if (roomCodeDisplay && room.roomId) {
         roomCodeDisplay.textContent = `Room: ${room.roomId}`;
@@ -215,7 +245,7 @@ function renderOnlineState(room) {
 
     if (room.status === 'active') {
         const yourTurn = room.yourTurn;
-        statusDisplay.innerHTML = yourTurn ? `Your turn (${room.yourSymbol})` : `Opponent's turn (${room.currentTurn})`;
+        statusDisplay.innerHTML = yourTurn ? `Your turn (${yourSymbol})` : `Opponent's turn (${turnSymbol})`;
         statusDisplay.style.color = yourTurn ? '#93c5fd' : 'var(--text-dim)';
         setOnlineFeedback(yourTurn ? 'Make your move.' : 'Waiting for opponent move.');
         return;
@@ -299,7 +329,10 @@ async function createOnlineRoom() {
     try {
         const data = await onlineApi('/rooms', {
             method: 'POST',
-            body: { playerName }
+            body: {
+                playerName,
+                symbolPairIndex: currentPairIndex
+            }
         });
 
         onlineSession = {
@@ -312,6 +345,30 @@ async function createOnlineRoom() {
         startOnlinePolling();
     } catch (error) {
         setOnlineFeedback(error.message, true);
+    }
+}
+
+async function setOnlineSymbolPair(index) {
+    const parsedIndex = Number(index);
+    if (!Number.isInteger(parsedIndex) || parsedIndex < 0 || parsedIndex >= symbolPairs.length) return;
+
+    // Local display preference: each player can pick their own symbol style in online mode.
+    currentPairIndex = parsedIndex;
+    updateSymbolButtons();
+    applyRemoteBoard(gameState, currentPairIndex);
+    if (!onlineSession) return;
+
+    try {
+        await onlineApi(`/rooms/${onlineSession.roomId}/style`, {
+            method: 'POST',
+            body: {
+                playerId: onlineSession.playerId,
+                symbolPairIndex: parsedIndex
+            }
+        });
+        setOnlineFeedback('Symbol style updated.');
+    } catch (error) {
+        setOnlineFeedback(`Symbol style lokaal aangepast. Server sync mislukt: ${error.message}`, true);
     }
 }
 
@@ -472,7 +529,7 @@ async function handleOnlineMove(clickedCellIndex) {
 }
 
 function handleCellClick(clickedCellEvent) {
-    const clickedCell = clickedCellEvent.target;
+    const clickedCell = clickedCellEvent.currentTarget || clickedCellEvent.target;
     const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
 
     console.log('Cell clicked:', clickedCellIndex, 'GameActive:', gameActive, 'GameState:', gameState[clickedCellIndex]);
@@ -706,14 +763,7 @@ function setDifficulty(level) {
 function setSymbolPair(index) {
     console.log(`Setting symbol pair index: ${index}`);
     currentPairIndex = parseInt(index);
-    symbolBtns.forEach(btn => {
-        const btnIndex = parseInt(btn.getAttribute('data-pair'));
-        if (btnIndex === currentPairIndex) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
+    updateSymbolButtons();
     handleRestartGame();
 }
 
@@ -773,7 +823,7 @@ if (diffBtns.length > 0) {
     diffBtns.forEach(btn => {
         const handler = (e) => {
             if (e.type === 'touchstart') e.preventDefault();
-            setDifficulty(e.target.getAttribute('data-level'));
+            setDifficulty(e.currentTarget.getAttribute('data-level'));
         };
         btn.addEventListener('click', handler);
         btn.addEventListener('touchstart', handler, { passive: false });
@@ -782,9 +832,16 @@ if (diffBtns.length > 0) {
 
 if (symbolBtns.length > 0) {
     symbolBtns.forEach(btn => {
-        const handler = (e) => {
+        const handler = async (e) => {
             if (e.type === 'touchstart') e.preventDefault();
-            setSymbolPair(e.target.getAttribute('data-pair'));
+            const nextPairIndex = parseInt(e.currentTarget.getAttribute('data-pair'));
+
+            if (isOnlineMode() && onlineSession) {
+                await setOnlineSymbolPair(nextPairIndex);
+                return;
+            }
+
+            setSymbolPair(nextPairIndex);
         };
         btn.addEventListener('click', handler);
         btn.addEventListener('touchstart', handler, { passive: false });
@@ -796,7 +853,7 @@ if (themeBtns.length > 0) {
     themeBtns.forEach(btn => {
         const handler = (e) => {
             if (e.type === 'touchstart') e.preventDefault();
-            setGameTheme(e.target.getAttribute('data-theme'));
+            setGameTheme(e.currentTarget.getAttribute('data-theme'));
         };
         btn.addEventListener('click', handler);
         btn.addEventListener('touchstart', handler, { passive: false });

@@ -9,6 +9,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const DIST_DIR = path.join(__dirname, 'dist');
 const ROOM_TTL_MS = 1000 * 60 * 60 * 6;
 const PLAYER_ONLINE_MS = 15000;
+const MAX_SYMBOL_PAIR_INDEX = 2;
 const rooms = new Map();
 
 function sendJson(res, statusCode, payload) {
@@ -30,7 +31,15 @@ function generateRoomId() {
   return id;
 }
 
-function createRoom(ownerName) {
+function normalizeSymbolPairIndex(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > MAX_SYMBOL_PAIR_INDEX) {
+    return 0;
+  }
+  return parsed;
+}
+
+function createRoom(ownerName, symbolPairIndex) {
   let roomId = generateRoomId();
   while (rooms.has(roomId)) {
     roomId = generateRoomId();
@@ -41,6 +50,7 @@ function createRoom(ownerName) {
   const room = {
     roomId,
     board: ['', '', '', '', '', '', '', '', ''],
+    symbolPairIndex: normalizeSymbolPairIndex(symbolPairIndex),
     currentTurn: 'X',
     status: 'waiting',
     winner: null,
@@ -91,6 +101,7 @@ function toRoomState(room, playerId) {
   return {
     roomId: room.roomId,
     board: room.board,
+    symbolPairIndex: room.symbolPairIndex,
     currentTurn: room.currentTurn,
     status: room.status,
     winner: room.winner,
@@ -185,7 +196,7 @@ async function handleApi(req, res) {
 
   if (req.method === 'POST' && pathname === '/api/multiplayer/rooms') {
     const body = await parseBody(req);
-    const { room, playerId } = createRoom(body.playerName);
+    const { room, playerId } = createRoom(body.playerName, body.symbolPairIndex);
     sendJson(res, 201, { ok: true, room: toRoomState(room, playerId), playerId });
     return;
   }
@@ -315,6 +326,29 @@ async function handleApi(req, res) {
     room.updatedAt = Date.now();
     player.lastSeen = Date.now();
 
+    sendJson(res, 200, { ok: true, room: toRoomState(room, body.playerId) });
+    return;
+  }
+
+  const roomStyleMatch = pathname.match(/^\/api\/multiplayer\/rooms\/([A-Z0-9]+)\/style$/);
+  if (req.method === 'POST' && roomStyleMatch) {
+    const roomId = roomStyleMatch[1].toUpperCase();
+    const room = getRoom(roomId);
+    if (!room) {
+      sendJson(res, 404, { ok: false, error: 'Room not found' });
+      return;
+    }
+
+    const body = await parseBody(req);
+    const player = room.players.find((entry) => entry.playerId === body.playerId);
+    if (!player) {
+      sendJson(res, 403, { ok: false, error: 'Invalid player' });
+      return;
+    }
+
+    room.symbolPairIndex = normalizeSymbolPairIndex(body.symbolPairIndex);
+    room.updatedAt = Date.now();
+    player.lastSeen = Date.now();
     sendJson(res, 200, { ok: true, room: toRoomState(room, body.playerId) });
     return;
   }
