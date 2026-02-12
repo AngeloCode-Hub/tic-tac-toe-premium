@@ -1,16 +1,149 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>webproject</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Hello from webproject!</h1>
-        <p>This is a scaffolded website project.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tic-Tac-Toe Premium</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="background-blobs">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
     </div>
-    <script src="main.js"></script>
-</body>
+
+    <main class="container">
+      <header>
+        <h1 class="game-title">Tic <span class="highlight">Tac</span> Toe</h1>
+        <div class="player-name-container">
+          <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20" />
+        </div>
+        <div class="status-display" id="status">Player X's Turn</div>
+      </header>
+
+      <div class="game-board" id="board">
+        <div class="cell" data-index="0"></div>
+        <div class="cell" data-index="1"></div>
+        <div class="cell" data-index="2"></div>
+        <div class="cell" data-index="3"></div>
+        <div class="cell" data-index="4"></div>
+        <div class="cell" data-index="5"></div>
+        <div class="cell" data-index="6"></div>
+        <div class="cell" data-index="7"></div>
+        <div class="cell" data-index="8"></div>
+      </div>
+
+      <div class="controls">
+        <div class="mode-selection">
+            <button id="pvpBtn" class="mode-btn active">PvP</button>
+            <button id="pvcBtn" class="mode-btn">PvAI</button>
+            <button id="onlineBtn" class="mode-btn">Online</button>
+        </div>
+        <button id="goOnlineBtn" class="btn-primary go-online-btn">Go Online</button>
+        <div class="difficulty-selection" id="difficultyContainer" style="display: none;">
+            <button class="diff-btn active" data-level="easy">Easy</button>
+            <button class="diff-btn" data-level="medium">Medium</button>
+            <button class="diff-btn" data-level="hard">Hard</button>
+        </div>
+        <div class="online-section" id="onlineSection" style="display: none;">
+          <div class="online-row">
+            <button class="online-btn" id="createRoomBtn">Create Room</button>
+          </div>
+          <div class="online-row online-join">
+            <input type="text" id="roomCodeInput" placeholder="Room code" maxlength="8" />
+            <button class="online-btn" id="joinRoomBtn">Join</button>
+          </div>
+          <div class="online-row online-room-info" id="onlineRoomInfo" style="display: none;">
+            <span id="roomCodeDisplay">Room: -</span>
+            <button class="online-btn" id="copyInviteBtn">Copy Invite</button>
+            <button class="online-btn danger" id="leaveRoomBtn">Leave</button>
+          </div>
+          <div class="online-feedback" id="onlineFeedback"></div>
+        </div>
+        
+        <div class="symbol-selection">
+            <span class="label">Style:</span>
+            <button class="symbol-btn active" data-pair="0">X / O</button>
+            <button class="symbol-btn" data-pair="1">🔥 / ❄️</button>
+            <button class="symbol-btn" data-pair="2">1 / 0</button>
+        </div>
+
+        <div class="theme-selection">
+            <span class="label">Theme:</span>
+            <button class="theme-btn active" data-theme="nebula" style="background: linear-gradient(135deg, hsl(250, 80%, 60%), hsl(320, 80%, 60%));"></button>
+            <button class="theme-btn" data-theme="ocean" style="background: linear-gradient(135deg, hsl(200, 80%, 60%), hsl(160, 80%, 60%));"></button>
+            <button class="theme-btn" data-theme="forest" style="background: linear-gradient(135deg, hsl(140, 80%, 60%), hsl(80, 80%, 60%));"></button>
+            <button class="theme-btn" data-theme="sunset" style="background: linear-gradient(135deg, hsl(340, 80%, 60%), hsl(20, 80%, 60%));"></button>
+        </div>
+
+        <button id="restartBtn" class="btn-primary">Restart Game</button>
+      </div>
+      
+      <!-- Scroll Hint -->
+      <div class="scroll-hint" id="scrollHint">
+        <span>↓ Scroll down to restart ↓</span>
+      </div>
+    </main>
+
+    <!-- Celebration Overlay -->
+    <div class="celebration-overlay" id="celebrationOverlay">
+      <div class="celebration-content" id="celebrationContent"></div>
+    </div>
+
+    <!-- Scoreboard Panel -->
+    <div class="scoreboard-panel" id="scoreboardPanel">
+      <div class="scoreboard-content">
+        <button class="close-scoreboard-btn" id="closeScoreboardBtn">✕</button>
+        <h2>Scoreboard</h2>
+        <div class="player-info">
+          <div class="player-name-display" id="playerNameDisplay">Guest</div>
+        </div>
+        <div class="score-stats">
+          <div class="stat-item">
+            <div class="stat-label">Wins</div>
+            <div class="stat-value" id="winsCount">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Losses</div>
+            <div class="stat-value" id="lossesCount">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Draws</div>
+            <div class="stat-value" id="drawsCount">0</div>
+          </div>
+        </div>
+        
+        <div class="share-section">
+          <h3>Share Your Stats</h3>
+          <div class="share-buttons">
+            <button class="share-btn whatsapp" id="shareWhatsApp" title="Share on WhatsApp">
+              <span>📱 WhatsApp</span>
+            </button>
+            <button class="share-btn facebook" id="shareFacebook" title="Share on Facebook">
+              <span>📘 Facebook</span>
+            </button>
+            <button class="share-btn copy" id="shareCopy" title="Copy Link">
+              <span>🔗 Copy Link</span>
+            </button>
+          </div>
+        </div>
+        
+        <button class="reset-stats-btn" id="resetStatsBtn">Reset Stats</button>
+      </div>
+    </div>
+
+    <!-- Scoreboard Tab Button -->
+    <button class="scoreboard-tab" id="scoreboardTab">
+      <span>🥇</span>
+    </button>
+
+    <script type="module" src="main.js"></script>
+  </body>
 </html>
