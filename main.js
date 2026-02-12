@@ -63,6 +63,7 @@ let currentPairIndex = 0;
 let currentPlayer = symbolPairs[0].p1;
 let onlineSession = null;
 let onlinePollInterval = null;
+let canEditOnlineSymbolStyle = true;
 
 const winningConditions = [
     [0, 1, 2],
@@ -130,6 +131,12 @@ function updateSymbolButtons() {
         } else {
             btn.classList.remove('active');
         }
+    });
+}
+
+function setSymbolSelectionDisabled(disabled) {
+    symbolBtns.forEach((btn) => {
+        btn.disabled = Boolean(disabled);
     });
 }
 
@@ -224,6 +231,14 @@ function applyRemoteBoard(board, pairIndex = currentPairIndex) {
 
 function renderOnlineState(room) {
     if (!room) return;
+
+    if (Number.isInteger(room.symbolPairIndex) && room.symbolPairIndex >= 0 && room.symbolPairIndex < symbolPairs.length) {
+        currentPairIndex = room.symbolPairIndex;
+        updateSymbolButtons();
+    }
+
+    canEditOnlineSymbolStyle = room.yourSymbol === 'X';
+    setSymbolSelectionDisabled(!canEditOnlineSymbolStyle);
 
     applyRemoteBoard(room.board, currentPairIndex);
     currentPlayer = room.currentTurn || 'X';
@@ -349,26 +364,27 @@ async function createOnlineRoom() {
 }
 
 async function setOnlineSymbolPair(index) {
+    if (!onlineSession) return;
+    if (!canEditOnlineSymbolStyle) {
+        setOnlineFeedback('Alleen de room-maker kan de tekens aanpassen.', true);
+        return;
+    }
+
     const parsedIndex = Number(index);
     if (!Number.isInteger(parsedIndex) || parsedIndex < 0 || parsedIndex >= symbolPairs.length) return;
 
-    // Local display preference: each player can pick their own symbol style in online mode.
-    currentPairIndex = parsedIndex;
-    updateSymbolButtons();
-    applyRemoteBoard(gameState, currentPairIndex);
-    if (!onlineSession) return;
-
     try {
-        await onlineApi(`/rooms/${onlineSession.roomId}/style`, {
+        const data = await onlineApi(`/rooms/${onlineSession.roomId}/style`, {
             method: 'POST',
             body: {
                 playerId: onlineSession.playerId,
                 symbolPairIndex: parsedIndex
             }
         });
-        setOnlineFeedback('Symbol style updated.');
+        renderOnlineState(data.room);
+        setOnlineFeedback('Symbol style updated for this room.');
     } catch (error) {
-        setOnlineFeedback(`Symbol style lokaal aangepast. Server sync mislukt: ${error.message}`, true);
+        setOnlineFeedback(error.message, true);
     }
 }
 
@@ -402,6 +418,8 @@ async function joinOnlineRoom(codeFromInput) {
 function leaveOnlineRoom() {
     stopOnlinePolling();
     onlineSession = null;
+    canEditOnlineSymbolStyle = true;
+    setSymbolSelectionDisabled(false);
     setOnlineControlsState(false);
     setOnlineFeedback('Left room.');
     if (roomCodeDisplay) roomCodeDisplay.textContent = 'Room: -';
@@ -736,12 +754,16 @@ function setGameMode(mode) {
             setOnlineControlsState(true);
             startOnlinePolling();
         } else {
+            canEditOnlineSymbolStyle = true;
+            setSymbolSelectionDisabled(false);
             setOnlineControlsState(false);
             statusDisplay.innerHTML = 'Create or join an online room.';
             statusDisplay.style.color = 'var(--text-dim)';
             setOnlineFeedback('Web multiplayer beta is ready.');
         }
     } else {
+        canEditOnlineSymbolStyle = true;
+        setSymbolSelectionDisabled(false);
         setOnlineFeedback('');
     }
 }

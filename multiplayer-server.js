@@ -345,6 +345,10 @@ async function handleApi(req, res) {
       sendJson(res, 403, { ok: false, error: 'Invalid player' });
       return;
     }
+    if (player.symbol !== 'X') {
+      sendJson(res, 403, { ok: false, error: 'Only the room creator can change symbol style' });
+      return;
+    }
 
     room.symbolPairIndex = normalizeSymbolPairIndex(body.symbolPairIndex);
     room.updatedAt = Date.now();
